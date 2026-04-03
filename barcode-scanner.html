@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Barcode Scanner" />
+  <meta name="description" content="Camera barcode scanner with product lookup" />
+  <title>Barcode Scanner</title>
+
+  <!-- Inline PWA manifest via Blob URL -->
+  <script>
+    (function () {
+      var svgIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#0f0e0c"/><rect x="60" y="120" width="30" height="272" fill="#4f98a3"/><rect x="110" y="120" width="15" height="272" fill="#4f98a3"/><rect x="145" y="120" width="25" height="272" fill="#4f98a3"/><rect x="190" y="120" width="12" height="272" fill="#4f98a3"/><rect x="222" y="120" width="35" height="272" fill="#4f98a3"/><rect x="277" y="120" width="20" height="272" fill="#4f98a3"/><rect x="317" y="120" width="10" height="272" fill="#4f98a3"/><rect x="347" y="120" width="30" height="272" fill="#4f98a3"/><rect x="397" y="120" width="15" height="272" fill="#4f98a3"/><rect x="432" y="120" width="20" height="272" fill="#4f98a3"/><rect x="100" y="60" width="60" height="8" fill="#4f98a3"/><rect x="100" y="68" width="8" height="52" fill="#4f98a3"/><rect x="352" y="60" width="60" height="8" fill="#4f98a3"/><rect x="404" y="68" width="8" height="52" fill="#4f98a3"/><rect x="100" y="444" width="60" height="8" fill="#4f98a3"/><rect x="100" y="392" width="8" height="52" fill="#4f98a3"/><rect x="352" y="444" width="60" height="8" fill="#4f98a3"/><rect x="404" y="392" width="8" height="52" fill="#4f98a3"/></svg>';
+      var iconBlob = new Blob([svgIcon], { type: 'image/svg+xml' });
+      var iconUrl = URL.createObjectURL(iconBlob);
+      var manifest = {
+        name: 'Barcode Scanner',
+        short_name: 'Scanner',
+        description: 'Camera barcode scanner with product lookup',
+        start_url: '.',
+        display: 'standalone',
+        orientation: 'portrait',
+        background_color: '#0f0e0c',
+        theme_color: '#0f0e0c',
+        icons: [
+          { src: iconUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
+        ]
+      };
+      var manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+      var manifestUrl = URL.createObjectURL(manifestBlob);
+      var link = document.createElement('link');
+      link.rel = 'manifest';
+      link.href = manifestUrl;
+      document.head.appendChild(link);
+
+      var appleTouchIcon = document.createElement('link');
+      appleTouchIcon.rel = 'apple-touch-icon';
+      appleTouchIcon.href = iconUrl;
+      document.head.appendChild(appleTouchIcon);
+    })();
+  </script>
+
+  <style>
+    /* ── CSS Custom Properties ──────────────────────────────── */
+    :root {
+      --bg: #0f0e0c;
+      --bg-card: #1a1917;
+      --bg-elevated: #242220;
+      --accent: #4f98a3;
+      --accent-dim: #3a7580;
+      --text: #f0ede8;
+      --text-muted: #8a8680;
+      --border: #2e2c2a;
+      --danger: #e05252;
+      --success: #52c78a;
+      --shadow: 0 4px 24px rgba(0,0,0,.5);
+      --radius: 16px;
+      --radius-sm: 8px;
+      --header-h: calc(56px + env(safe-area-inset-top));
+      --footer-h: calc(80px + env(safe-area-inset-bottom));
+    }
+
+    [data-theme="light"] {
+      --bg: #f5f3ef;
+      --bg-card: #ffffff;
+      --bg-elevated: #eceae5;
+      --accent: #3a7580;
+      --accent-dim: #2d5d66;
+      --text: #1a1917;
+      --text-muted: #6b6865;
+      --border: #d8d4cd;
+      --shadow: 0 4px 24px rgba(0,0,0,.12);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* ── Reset / Base ───────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      outline: none;
+      background: none;
+      color: inherit;
+      min-width: 44px;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    img { display: block; }
+
+    /* ── App Shell ──────────────────────────────────────────── */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      height: 100dvh;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: env(safe-area-inset-top) 16px 0;
+      height: var(--header-h);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-logo svg { width: 32px; height: 32px; }
+
+    .header-logo h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: var(--text);
+    }
+
+    .header-actions { display: flex; gap: 4px; }
+
+    .icon-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      color: var(--text-muted);
+      transition: color .2s, background .2s;
+    }
+
+    .icon-btn:hover, .icon-btn:active { color: var(--text); background: var(--bg-elevated); }
+
+    /* ── Main ───────────────────────────────────────────────── */
+    main {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── Views ──────────────────────────────────────────────── */
+    .view {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: opacity .25s, transform .25s;
+    }
+
+    .view.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+    }
+
+    /* ── Scanner View ───────────────────────────────────────── */
+    #scanner {
+      background: #000;
+    }
+
+    .video-wrap {
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #camera-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #scan-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* ── Scan Overlay ───────────────────────────────────────── */
+    .scan-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .scan-dimmer {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      mask: url(#scan-mask);
+      -webkit-mask: url(#scan-mask);
+    }
+
+    .scan-box {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(72vw, 280px);
+      height: min(72vw, 280px);
+    }
+
+    .scan-corner {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-color: var(--accent);
+      border-style: solid;
+      border-width: 0;
+    }
+
+    .scan-corner.tl { top: 0; left: 0; border-top-width: 3px; border-left-width: 3px; border-radius: 4px 0 0 0; }
+    .scan-corner.tr { top: 0; right: 0; border-top-width: 3px; border-right-width: 3px; border-radius: 0 4px 0 0; }
+    .scan-corner.bl { bottom: 0; left: 0; border-bottom-width: 3px; border-left-width: 3px; border-radius: 0 0 0 4px; }
+    .scan-corner.br { bottom: 0; right: 0; border-bottom-width: 3px; border-right-width: 3px; border-radius: 0 0 4px 0; }
+
+    .scan-line {
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      animation: scanline 2.5s ease-in-out infinite;
+      top: 0;
+    }
+
+    @keyframes scanline {
+      0% { top: 4px; opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { top: calc(100% - 6px); opacity: 0; }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .6; }
+    }
+
+    .scan-box .scan-corner {
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .scan-hint {
+      position: absolute;
+      bottom: -28px;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      font-size: 13px;
+      color: rgba(255,255,255,.7);
+      letter-spacing: .2px;
+    }
+
+    /* ── Scanner Controls ───────────────────────────────────── */
+    .scanner-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      background: rgba(0,0,0,.8);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .ctrl-btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      font-size: 22px;
+      transition: background .2s, transform .1s;
+    }
+
+    .ctrl-btn:active { transform: scale(.93); }
+
+    .ctrl-btn.active { background: var(--accent); }
+
+    /* ── History Strip ──────────────────────────────────────── */
+    .history-strip {
+      padding: 6px 12px 0;
+      background: rgba(0,0,0,.8);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .history-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: rgba(255,255,255,.4);
+      margin-bottom: 6px;
+    }
+
+    .history-items {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      scrollbar-width: none;
+    }
+
+    .history-items::-webkit-scrollbar { display: none; }
+
+    .history-chip {
+      flex-shrink: 0;
+      background: rgba(79,152,163,.2);
+      border: 1px solid rgba(79,152,163,.4);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: rgba(255,255,255,.8);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .2s;
+      min-height: 28px;
+      display: flex;
+      align-items: center;
+    }
+
+    .history-chip:hover { background: rgba(79,152,163,.35); }
+
+    .history-empty {
+      font-size: 12px;
+      color: rgba(255,255,255,.3);
+      padding-bottom: 8px;
+    }
+
+    /* ── Error / Permission Denied ──────────────────────────── */
+    .camera-error {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 24px;
+      background: #000;
+      text-align: center;
+    }
+
+    .camera-error.hidden { display: none; }
+
+    .camera-error svg { color: var(--accent); }
+
+    .camera-error p {
+      font-size: 15px;
+      color: rgba(255,255,255,.7);
+      max-width: 280px;
+      line-height: 1.5;
+    }
+
+    .camera-error strong { color: #fff; display: block; font-size: 18px; margin-bottom: 4px; }
+
+    .retry-btn {
+      background: var(--accent);
+      color: #fff;
+      border-radius: 24px;
+      padding: 12px 28px;
+      font-size: 15px;
+      font-weight: 600;
+      min-height: 48px;
+      transition: background .2s;
+    }
+
+    .retry-btn:active { background: var(--accent-dim); }
+
+    /* ── Result View ────────────────────────────────────────── */
+    #result {
+      background: var(--bg);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .result-inner {
+      padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* ── Skeleton ───────────────────────────────────────────── */
+    .skeleton {
+      border-radius: var(--radius);
+      background: var(--bg-elevated);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .skeleton::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.06) 50%, transparent 100%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    .skeleton-img { width: 100%; height: 220px; margin-bottom: 12px; }
+    .skeleton-line { height: 20px; margin-bottom: 10px; }
+    .skeleton-line.short { width: 60%; }
+    .skeleton-line.medium { width: 80%; }
+
+    #skeleton-card { display: none; }
+    #skeleton-card.visible { display: block; }
+
+    /* ── Product Card ───────────────────────────────────────── */
+    #product-card { display: none; }
+    #product-card.visible { display: block; }
+
+    .product-img-wrap {
+      width: 100%;
+      height: 220px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--bg-elevated);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .product-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .product-img-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .product-img-placeholder svg { width: 64px; height: 64px; }
+
+    .barcode-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-family: 'SF Mono', Menlo, Monaco, 'Courier New', monospace;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .product-name {
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1.25;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .product-brand {
+      font-size: 15px;
+      color: var(--accent);
+      font-weight: 500;
+      margin-bottom: 12px;
+    }
+
+    .product-category {
+      display: inline-block;
+      background: var(--bg-elevated);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .ingredients-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg-card);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      border: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+
+    /* ── Nutrition Table ────────────────────────────────────── */
+    .nutrition-wrap {
+      background: var(--bg-card);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .nutrition-header {
+      background: var(--accent);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      padding: 8px 14px;
+    }
+
+    .nutrition-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .nutrition-table tr:not(:last-child) td {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nutrition-table td {
+      padding: 10px 14px;
+      color: var(--text);
+    }
+
+    .nutrition-table td:last-child {
+      text-align: right;
+      font-weight: 600;
+    }
+
+    .nutrition-table tr:nth-child(even) td {
+      background: var(--bg-elevated);
+    }
+
+    /* ── Error Card ─────────────────────────────────────────── */
+    #error-card { display: none; }
+    #error-card.visible { display: block; }
+
+    .error-card-inner {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      text-align: center;
+    }
+
+    .error-card-inner svg { margin: 0 auto 12px; color: var(--text-muted); }
+
+    .error-card-inner strong { font-size: 18px; display: block; margin-bottom: 8px; }
+
+    .error-card-inner p { font-size: 14px; color: var(--text-muted); line-height: 1.5; }
+
+    .barcode-raw {
+      font-family: 'SF Mono', Menlo, Monaco, 'Courier New', monospace;
+      color: var(--accent);
+      margin-top: 8px;
+      display: block;
+    }
+
+    /* ── Scan Again Button ──────────────────────────────────── */
+    .scan-again-btn {
+      display: block;
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      border-radius: var(--radius);
+      font-size: 16px;
+      font-weight: 700;
+      height: 54px;
+      margin-top: 20px;
+      transition: background .2s, transform .1s;
+      letter-spacing: .2px;
+    }
+
+    .scan-again-btn:active {
+      background: var(--accent-dim);
+      transform: scale(.98);
+    }
+  </style>
+</head>
+
+<body>
+<div id="app">
+
+  <!-- ── Header ─────────────────────────────────────────── -->
+  <header>
+    <div class="header-logo">
+      <!-- Inline SVG logo: camera + barcode motif -->
+      <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <rect width="64" height="64" rx="14" fill="#4f98a3"/>
+        <!-- camera body -->
+        <rect x="8" y="20" width="48" height="30" rx="5" fill="#0f0e0c"/>
+        <circle cx="32" cy="35" r="10" fill="none" stroke="#4f98a3" stroke-width="3"/>
+        <circle cx="32" cy="35" r="5" fill="#4f98a3"/>
+        <!-- viewfinder nub -->
+        <rect x="24" y="14" width="16" height="8" rx="3" fill="#0f0e0c"/>
+        <!-- barcode lines -->
+        <rect x="17" y="28" width="3" height="14" rx="1" fill="#4f98a3" opacity=".5"/>
+        <rect x="22" y="28" width="1.5" height="14" rx="1" fill="#4f98a3" opacity=".5"/>
+        <rect x="25" y="28" width="2.5" height="14" rx="1" fill="#4f98a3" opacity=".5"/>
+      </svg>
+      <h1>Barcode Scanner</h1>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="theme-toggle" aria-label="Toggle light/dark theme">
+        <svg id="theme-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ── Main ───────────────────────────────────────────── -->
+  <main>
+
+    <!-- ── Scanner View ──────────────────────────────────── -->
+    <section id="scanner" class="view" aria-label="Barcode scanner">
+
+      <!-- Camera / video layer -->
+      <div class="video-wrap">
+        <video id="camera-video" playsinline autoplay muted aria-hidden="true"></video>
+        <canvas id="scan-canvas" aria-hidden="true"></canvas>
+
+        <!-- Animated scan overlay -->
+        <div class="scan-overlay" aria-hidden="true">
+          <div class="scan-box" id="scan-box">
+            <div class="scan-corner tl"></div>
+            <div class="scan-corner tr"></div>
+            <div class="scan-corner bl"></div>
+            <div class="scan-corner br"></div>
+            <div class="scan-line"></div>
+            <span class="scan-hint">Point camera at a barcode</span>
+          </div>
+        </div>
+
+        <!-- Permission / camera error -->
+        <div class="camera-error hidden" id="camera-error">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <line x1="1" y1="1" x2="23" y2="23" stroke="#e05252"/>
+          </svg>
+          <p><strong id="camera-error-title">Camera access denied</strong><span id="camera-error-msg">Please allow camera access in your browser settings, then tap Retry.</span></p>
+          <button class="retry-btn" id="retry-camera-btn" aria-label="Retry camera access">Retry</button>
+        </div>
+      </div>
+
+      <!-- History strip -->
+      <div class="history-strip" id="history-strip" aria-label="Recent scans">
+        <p class="history-label">Recent scans</p>
+        <div class="history-items" id="history-items">
+          <span class="history-empty" id="history-empty">No scans yet</span>
+        </div>
+      </div>
+
+      <!-- Bottom controls -->
+      <div class="scanner-controls">
+        <button class="ctrl-btn" id="torch-btn" aria-label="Toggle flashlight" style="display:none">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+        </button>
+      </div>
+
+    </section>
+
+    <!-- ── Result View ────────────────────────────────────── -->
+    <section id="result" class="view hidden" aria-label="Scan result">
+      <div class="result-inner">
+
+        <!-- Skeleton loading state -->
+        <div id="skeleton-card">
+          <div class="skeleton skeleton-img"></div>
+          <div class="skeleton skeleton-line medium"></div>
+          <div class="skeleton skeleton-line short"></div>
+          <div class="skeleton skeleton-line"></div>
+          <div class="skeleton skeleton-line medium"></div>
+        </div>
+
+        <!-- Product card -->
+        <article id="product-card" aria-live="polite">
+          <div class="product-img-wrap" id="product-img-wrap">
+            <!-- filled by JS -->
+          </div>
+
+          <div class="barcode-badge" id="barcode-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M3 5v14M7 5v14M11 5v14M15 5v14M19 5v14"/>
+            </svg>
+            <span id="barcode-display"></span>
+          </div>
+
+          <h2 class="product-name" id="product-name"></h2>
+          <p class="product-brand" id="product-brand"></p>
+          <span class="product-category" id="product-category"></span>
+
+          <div id="ingredients-section" style="display:none">
+            <p class="section-title">Ingredients</p>
+            <p class="ingredients-text" id="ingredients-text"></p>
+          </div>
+
+          <div id="nutrition-section" style="display:none">
+            <div class="nutrition-wrap">
+              <div class="nutrition-header">Nutrition per 100g</div>
+              <table class="nutrition-table" aria-label="Nutrition information per 100 grams">
+                <tbody id="nutrition-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </article>
+
+        <!-- Not found / error state -->
+        <div id="error-card" aria-live="polite">
+          <div class="error-card-inner">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <strong id="error-title">Product not found</strong>
+            <p id="error-msg">No product information is available for this barcode.</p>
+            <span class="barcode-raw" id="error-barcode"></span>
+          </div>
+        </div>
+
+        <button class="scan-again-btn" id="scan-again-btn" aria-label="Scan another barcode">
+          Scan Again
+        </button>
+
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ZXing library via CDN -->
+<script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ── Constants ────────────────────────────────────────────── */
+  const DEBOUNCE_MS            = 500;
+  const MAX_HISTORY            = 5;
+  const MAX_HISTORY_CHIP_LEN   = 22;
+  const ZXING_LOAD_RETRY_MS    = 200;
+  const MAX_ZXING_LOAD_ATTEMPTS = 30;
+  const PRODUCT_IMG_WIDTH      = 400;
+  const PRODUCT_IMG_HEIGHT     = 220;
+
+  /* ── State ────────────────────────────────────────────────── */
+  const state = {
+    scanning: false,
+    torchOn: false,
+    torchAvailable: false,
+    stream: null,
+    imageCapture: null,
+    codeReader: null,
+    lastScanTime: 0,
+    history: [],   // [{barcode, name}]
+    currentView: 'scanner'
+  };
+
+  /* ── Element refs ─────────────────────────────────────────── */
+  const $ = id => document.getElementById(id);
+  const els = {
+    video:        $('camera-video'),
+    canvas:       $('scan-canvas'),
+    scanBox:      $('scan-box'),
+    cameraError:  $('camera-error'),
+    errorTitle:   $('camera-error-title'),
+    errorMsg:     $('camera-error-msg'),
+    retryBtn:     $('retry-camera-btn'),
+    torchBtn:     $('torch-btn'),
+    historyItems: $('history-items'),
+    historyEmpty: $('history-empty'),
+    scannerView:  $('scanner'),
+    resultView:   $('result'),
+    skeletonCard: $('skeleton-card'),
+    productCard:  $('product-card'),
+    errorCard:    $('error-card'),
+    productImgWrap: $('product-img-wrap'),
+    barcodeDisplay: $('barcode-display'),
+    barcodeBadge:   $('barcode-badge'),
+    productName:    $('product-name'),
+    productBrand:   $('product-brand'),
+    productCategory: $('product-category'),
+    ingredientsSection: $('ingredients-section'),
+    ingredientsText: $('ingredients-text'),
+    nutritionSection: $('nutrition-section'),
+    nutritionBody: $('nutrition-body'),
+    errorCardTitle: $('error-title'),
+    errorCardMsg:   $('error-msg'),
+    errorBarcode:   $('error-barcode'),
+    scanAgainBtn:   $('scan-again-btn'),
+    themeToggle:    $('theme-toggle'),
+    themeIcon:      $('theme-icon')
+  };
+
+  /* ── Theme toggle ─────────────────────────────────────────── */
+  const THEME_ICONS = {
+    dark:  `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`,
+    light: `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`
+  };
+
+  function updateThemeIcon(isDark) {
+    els.themeIcon.innerHTML = isDark ? THEME_ICONS.dark : THEME_ICONS.light;
+  }
+
+  els.themeToggle.addEventListener('click', () => {
+    const html = document.documentElement;
+    const nowDark = html.getAttribute('data-theme') === 'dark';
+    html.setAttribute('data-theme', nowDark ? 'light' : 'dark');
+    updateThemeIcon(!nowDark);
+  });
+
+  // Init theme icon
+  updateThemeIcon(true);
+
+  /* ── View navigation ──────────────────────────────────────── */
+  function showView(viewName) {
+    state.currentView = viewName;
+    if (viewName === 'scanner') {
+      els.scannerView.classList.remove('hidden');
+      els.resultView.classList.add('hidden');
+      startCamera();
+    } else {
+      els.scannerView.classList.add('hidden');
+      els.resultView.classList.remove('hidden');
+      stopCamera();
+    }
+  }
+
+  /* ── Camera / stream ──────────────────────────────────────── */
+  async function startCamera() {
+    if (state.stream) return; // already running
+    els.cameraError.classList.add('hidden');
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      });
+      state.stream = stream;
+      els.video.srcObject = stream;
+      await els.video.play();
+
+      // Torch capability detection
+      const track = stream.getVideoTracks()[0];
+      if (track) {
+        const caps = track.getCapabilities ? track.getCapabilities() : {};
+        if (caps.torch) {
+          state.torchAvailable = true;
+          els.torchBtn.style.display = 'flex';
+          if (typeof ImageCapture !== 'undefined') {
+            state.imageCapture = new ImageCapture(track);
+          }
+        }
+      }
+
+      startDecoding();
+    } catch (err) {
+      handleCameraError(err);
+    }
+  }
+
+  function stopCamera() {
+    stopDecoding();
+    if (state.stream) {
+      state.stream.getTracks().forEach(t => t.stop());
+      state.stream = null;
+    }
+    els.video.srcObject = null;
+    if (state.torchOn) toggleTorch(false);
+    state.torchAvailable = false;
+    els.torchBtn.style.display = 'none';
+  }
+
+  function handleCameraError(err) {
+    els.cameraError.classList.remove('hidden');
+    const name = err && err.name ? err.name : '';
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+      els.errorTitle.textContent = 'Camera access denied';
+      els.errorMsg.textContent = 'Please allow camera access in your browser settings, then tap Retry.';
+    } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+      els.errorTitle.textContent = 'No camera found';
+      els.errorMsg.textContent = 'This device does not appear to have a camera.';
+    } else {
+      els.errorTitle.textContent = 'Camera error';
+      els.errorMsg.textContent = 'Could not start the camera. ' + (err ? err.message : '');
+    }
+  }
+
+  els.retryBtn.addEventListener('click', () => {
+    els.cameraError.classList.add('hidden');
+    startCamera();
+  });
+
+  /* ── Torch ────────────────────────────────────────────────── */
+  async function toggleTorch(forceOff) {
+    if (!state.stream) return;
+    const track = state.stream.getVideoTracks()[0];
+    if (!track) return;
+    try {
+      const target = forceOff === true ? false : !state.torchOn;
+      await track.applyConstraints({ advanced: [{ torch: target }] });
+      state.torchOn = target;
+      els.torchBtn.classList.toggle('active', state.torchOn);
+    } catch (e) {
+      // silently fail — torch may not be supported
+    }
+  }
+
+  els.torchBtn.addEventListener('click', () => toggleTorch());
+
+  /* ── Barcode decoding ─────────────────────────────────────── */
+  function startDecoding() {
+    if (!window.ZXing) { scheduleDecodeRetry(); return; }
+    const hints = new Map();
+    const formats = [
+      ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.UPC_A,
+      ZXing.BarcodeFormat.UPC_E,
+      ZXing.BarcodeFormat.QR_CODE,
+      ZXing.BarcodeFormat.CODE_128,
+      ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.ITF,
+      ZXing.BarcodeFormat.DATA_MATRIX
+    ];
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
+    state.codeReader = new ZXing.BrowserMultiFormatReader(hints);
+    state.scanning = true;
+    decodeLoop();
+  }
+
+  function stopDecoding() {
+    state.scanning = false;
+    if (state.codeReader) {
+      try { state.codeReader.reset(); } catch(e) {}
+      state.codeReader = null;
+    }
+  }
+
+  function scheduleDecodeRetry() {
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      if (window.ZXing) {
+        clearInterval(interval);
+        if (state.stream) startDecoding();
+      } else if (attempts > MAX_ZXING_LOAD_ATTEMPTS) {
+        clearInterval(interval);
+      }
+    }, ZXING_LOAD_RETRY_MS);
+  }
+
+  function decodeLoop() {
+    if (!state.scanning) return;
+
+    requestAnimationFrame(async () => {
+      if (!state.scanning || !state.codeReader) return;
+
+      try {
+        if (els.video.readyState >= 2) {
+          const result = await state.codeReader.decodeOnceFromVideoElement(els.video);
+          if (result) {
+            const now = Date.now();
+            if (now - state.lastScanTime > DEBOUNCE_MS) {
+              state.lastScanTime = now;
+              onBarcodeDetected(result.getText());
+              return; // pause loop while showing result
+            }
+          }
+        }
+      } catch (e) {
+        // NotFoundException is expected (no barcode in frame) — ignore
+      }
+
+      // draw scan feedback
+      drawScanOverlay();
+      decodeLoop();
+    });
+  }
+
+  function drawScanOverlay() {
+    const canvas = els.canvas;
+    const video = els.video;
+    if (!video.videoWidth) return;
+
+    canvas.width = video.offsetWidth;
+    canvas.height = video.offsetHeight;
+    // Canvas is purely visual; the corner CSS boxes handle the main UI overlay
+  }
+
+  /* ── Scan detected ────────────────────────────────────────── */
+  function onBarcodeDetected(barcode) {
+    addToHistory(barcode);
+    navigateToResult(barcode);
+  }
+
+  /* ── History ─────────────────────────────────────────────── */
+  function addToHistory(barcode, name) {
+    // Remove duplicate
+    state.history = state.history.filter(h => h.barcode !== barcode);
+    state.history.unshift({ barcode, name: name || barcode });
+    if (state.history.length > MAX_HISTORY) {
+      state.history = state.history.slice(0, MAX_HISTORY);
+    }
+    renderHistory();
+  }
+
+  function updateHistoryName(barcode, name) {
+    const item = state.history.find(h => h.barcode === barcode);
+    if (item) {
+      item.name = name;
+      renderHistory();
+    }
+  }
+
+  function renderHistory() {
+    const items = els.historyItems;
+    // Remove all chips (not the empty placeholder)
+    Array.from(items.querySelectorAll('.history-chip')).forEach(c => c.remove());
+
+    if (state.history.length === 0) {
+      els.historyEmpty.style.display = '';
+      return;
+    }
+
+    els.historyEmpty.style.display = 'none';
+    state.history.forEach(h => {
+      const chip = document.createElement('button');
+      chip.className = 'history-chip';
+      chip.textContent = h.name.length > MAX_HISTORY_CHIP_LEN ? h.name.slice(0, MAX_HISTORY_CHIP_LEN) + '…' : h.name;
+      chip.setAttribute('aria-label', 'Re-open result for barcode ' + h.barcode);
+      chip.addEventListener('click', () => navigateToResult(h.barcode));
+      items.appendChild(chip);
+    });
+  }
+
+  /* ── Navigate to result ───────────────────────────────────── */
+  function navigateToResult(barcode) {
+    showView('result');
+    showSkeleton();
+    lookupProduct(barcode);
+  }
+
+  /* ── Product lookup ───────────────────────────────────────── */
+  async function lookupProduct(barcode) {
+    try {
+      // 1. Try Open Food Facts
+      const food = await fetchOpenFoodFacts(barcode);
+      if (food) {
+        renderProduct(barcode, food);
+        updateHistoryName(barcode, food.name || barcode);
+        return;
+      }
+
+      // 2. Try Open Library (ISBN)
+      const book = await fetchOpenLibrary(barcode);
+      if (book) {
+        renderProduct(barcode, book);
+        updateHistoryName(barcode, book.name || barcode);
+        return;
+      }
+
+      // 3. Not found
+      showError(barcode, 'Product not found', 'No product information is available for this barcode.');
+    } catch (err) {
+      showError(barcode, 'Lookup failed', 'Could not retrieve product information. Please check your connection.');
+    }
+  }
+
+  async function fetchOpenFoodFacts(barcode) {
+    try {
+      const url = `https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(barcode)}.json`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data || data.status !== 1 || !data.product) return null;
+
+      const p = data.product;
+      const n = p.nutriments || {};
+
+      return {
+        type: 'food',
+        name: p.product_name || p.product_name_en || '',
+        brand: p.brands || '',
+        category: (p.categories || '').split(',')[0].trim(),
+        image: p.image_url || p.image_front_url || '',
+        ingredients: p.ingredients_text || '',
+        nutrition: {
+          energy:   formatNutrient(n['energy-kcal_100g'] || n['energy_100g'], 'kcal'),
+          fat:      formatNutrient(n['fat_100g'], 'g'),
+          carbs:    formatNutrient(n['carbohydrates_100g'], 'g'),
+          protein:  formatNutrient(n['proteins_100g'], 'g'),
+          salt:     formatNutrient(n['salt_100g'], 'g'),
+          fiber:    formatNutrient(n['fiber_100g'], 'g'),
+        }
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function formatNutrient(val, unit) {
+    if (val === undefined || val === null || val === '') return null;
+    const num = parseFloat(val);
+    if (isNaN(num)) return null;
+    return num.toFixed(1) + ' ' + unit;
+  }
+
+  async function fetchOpenLibrary(barcode) {
+    try {
+      const url = `https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(barcode)}&format=json&jscmd=data`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const key = `ISBN:${barcode}`;
+      if (!data || !data[key]) return null;
+
+      const b = data[key];
+      const authors = (b.authors || []).map(a => a.name).join(', ');
+
+      return {
+        type: 'book',
+        name: b.title || '',
+        brand: authors,
+        category: 'Book',
+        image: (b.cover && (b.cover.large || b.cover.medium || b.cover.small)) || '',
+        ingredients: b.notes || (b.subjects || []).slice(0, 5).map(s => s.name || s).join(', '),
+        description: b.notes || ''
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /* ── Render helpers ───────────────────────────────────────── */
+  function showSkeleton() {
+    els.skeletonCard.classList.add('visible');
+    els.productCard.classList.remove('visible');
+    els.errorCard.classList.remove('visible');
+  }
+
+  function hideSkeleton() {
+    els.skeletonCard.classList.remove('visible');
+  }
+
+  function renderProduct(barcode, product) {
+    hideSkeleton();
+
+    // Image
+    const imgWrap = els.productImgWrap;
+    imgWrap.innerHTML = '';
+    if (product.image) {
+      const img = document.createElement('img');
+      img.className = 'product-img';
+      img.src = product.image;
+      img.alt = product.name || 'Product image';
+      img.width = PRODUCT_IMG_WIDTH;
+      img.height = PRODUCT_IMG_HEIGHT;
+      img.loading = 'lazy';
+      img.onerror = () => {
+        imgWrap.innerHTML = placeholderHTML(product.type);
+      };
+      imgWrap.appendChild(img);
+    } else {
+      imgWrap.innerHTML = placeholderHTML(product.type);
+    }
+
+    // Barcode badge
+    els.barcodeDisplay.textContent = barcode;
+
+    // Name
+    els.productName.textContent = product.name || 'Unknown product';
+
+    // Brand / author
+    els.productBrand.textContent = product.brand || '';
+    els.productBrand.style.display = product.brand ? '' : 'none';
+
+    // Category
+    els.productCategory.textContent = product.category || '';
+    els.productCategory.style.display = product.category ? '' : 'none';
+
+    // Ingredients / subjects
+    if (product.ingredients) {
+      els.ingredientsSection.style.display = '';
+      els.ingredientsText.textContent = product.ingredients;
+    } else {
+      els.ingredientsSection.style.display = 'none';
+    }
+
+    // Nutrition
+    if (product.type === 'food' && product.nutrition) {
+      const rows = [
+        { label: 'Calories', val: product.nutrition.energy },
+        { label: 'Fat', val: product.nutrition.fat },
+        { label: 'Carbohydrates', val: product.nutrition.carbs },
+        { label: 'Protein', val: product.nutrition.protein },
+        { label: 'Salt', val: product.nutrition.salt },
+        { label: 'Fibre', val: product.nutrition.fiber },
+      ].filter(r => r.val !== null);
+
+      if (rows.length > 0) {
+        els.nutritionSection.style.display = '';
+        els.nutritionBody.innerHTML = rows.map(r =>
+          `<tr><td>${escHtml(r.label)}</td><td>${escHtml(r.val)}</td></tr>`
+        ).join('');
+      } else {
+        els.nutritionSection.style.display = 'none';
+      }
+    } else {
+      els.nutritionSection.style.display = 'none';
+    }
+
+    els.productCard.classList.add('visible');
+    els.errorCard.classList.remove('visible');
+  }
+
+  function placeholderHTML(type) {
+    const icon = type === 'book'
+      ? `<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`
+      : `<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
+    return `<div class="product-img-placeholder">${icon}<span>No image available</span></div>`;
+  }
+
+  function showError(barcode, title, msg) {
+    hideSkeleton();
+    els.productCard.classList.remove('visible');
+    els.errorCardTitle.textContent = title;
+    els.errorCardMsg.textContent = msg;
+    els.errorBarcode.textContent = barcode;
+    els.errorCard.classList.add('visible');
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /* ── Scan Again ───────────────────────────────────────────── */
+  els.scanAgainBtn.addEventListener('click', () => {
+    showView('scanner');
+  });
+
+  /* ── Boot ─────────────────────────────────────────────────── */
+  showView('scanner');
+
+})();
+</script>
+</body>
+</html>
