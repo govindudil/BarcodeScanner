@@ -12,6 +12,7 @@ const app = createApp({
     const manualBarcode = ref('');
     const showFlash = ref(false);
     const toast = ref(null);
+    const detectedBarcode = ref(null);
 
     let html5Qrcode = null;
 
@@ -63,6 +64,7 @@ const app = createApp({
     // ── Scanner ──
     async function startScanner() {
       error.value = null;
+      detectedBarcode.value = null;
       try {
         html5Qrcode = new Html5Qrcode('scanner-region', {
           formatsToSupport: [
@@ -125,6 +127,9 @@ const app = createApp({
     }
 
     async function onScanSuccess(decodedText) {
+      // Show the detected barcode in the scanner hint area
+      detectedBarcode.value = decodedText;
+
       // Immediately stop scanning
       await stopScanner();
 
@@ -132,6 +137,9 @@ const app = createApp({
       showFlash.value = true;
       setTimeout(() => showFlash.value = false, 500);
       if (navigator.vibrate) navigator.vibrate(100);
+
+      // Brief delay so the user sees the detected barcode before switching views
+      await new Promise(resolve => setTimeout(resolve, 800));
 
       await lookupProduct(decodedText);
     }
@@ -233,6 +241,7 @@ const app = createApp({
       manualBarcode,
       showFlash,
       toast,
+      detectedBarcode,
       startScanner,
       stopScanner,
       switchTab,
@@ -291,7 +300,9 @@ const app = createApp({
           </div>
         </div>
 
-        <p v-if="scannerActive" class="scanner-hint">Point camera at a barcode</p>
+        <p v-if="scannerActive || detectedBarcode" class="scanner-hint">
+          {{ detectedBarcode ? '🏷️ ' + detectedBarcode : 'Point camera at a barcode' }}
+        </p>
 
         <!-- Camera error message -->
         <div v-if="error && currentTab === 'scanner'" class="error-card">
