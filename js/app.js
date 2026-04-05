@@ -67,25 +67,40 @@ const app = createApp({
     async function startScanner() {
       error.value = null;
       try {
-        html5Qrcode = new Html5Qrcode('scanner-region');
+        html5Qrcode = new Html5Qrcode('scanner-region', {
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.ITF,
+            Html5QrcodeSupportedFormats.CODABAR,
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.DATA_MATRIX,
+          ],
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          },
+          verbose: false
+        });
         await html5Qrcode.start(
           { facingMode: 'environment' },
           {
-            fps: 10,
+            fps: 15,
             qrbox: function(viewfinderWidth, viewfinderHeight) {
-              const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-              return { width: Math.floor(minEdge * 0.8), height: Math.floor(minEdge * 0.5) };
+              return {
+                width: Math.floor(viewfinderWidth * 0.9),
+                height: Math.floor(viewfinderHeight * 0.5)
+              };
             },
             aspectRatio: 4 / 3,
-            formatsToSupport: [
-              Html5QrcodeSupportedFormats.EAN_13,
-              Html5QrcodeSupportedFormats.EAN_8,
-              Html5QrcodeSupportedFormats.UPC_A,
-              Html5QrcodeSupportedFormats.UPC_E,
-              Html5QrcodeSupportedFormats.CODE_128,
-              Html5QrcodeSupportedFormats.CODE_39,
-              Html5QrcodeSupportedFormats.QR_CODE,
-            ],
+            disableFlip: true,
+            videoConstraints: {
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
           },
           onScanSuccess,
           () => {} // ignore scan errors (continuous scanning)
