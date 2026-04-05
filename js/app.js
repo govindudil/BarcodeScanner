@@ -12,6 +12,9 @@ const app = createApp({
     const manualBarcode = ref('');
     const showFlash = ref(false);
     const toast = ref(null);
+    const uploadScanning = ref(false);
+    const uploadPreview = ref(null);
+    const uploadError = ref(null);
 
     let html5Qrcode = null;
 
@@ -157,6 +160,187 @@ const app = createApp({
       }
     }
 
+    // ── Image Upload Scanning ──
+    const SCAN_FORMATS = [
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.QR_CODE,
+    ];
+
+    async function scanWithHtml5Qrcode(file) {
+      const tempScanner = new Html5Qrcode('upload-scan-region');
+      try {
+        return await tempScanner.scanFileV2(file, /* showImage= */ false);
+      } finally {
+        tempScanner.clear();
+      }
+    }
+
+    async function scanWithBarcodeDetector(file) {
+      if (!('BarcodeDetector' in window)) throw new Error('BarcodeDetector not available');
+      const bitmap = await createImageBitmap(file);
+      try {
+        const detector = new BarcodeDetector({
+          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code'],
+        });
+        const results = await detector.detect(bitmap);
+        if (results.length > 0) return results[0].rawValue;
+        throw new Error('No barcode detected');
+      } finally {
+        bitmap.close();
+      }
+    }
+
+    async function preprocessAndRescan(file) {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      try {
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = url;
+        });
+
+        const MAX_DIM = 1920;
+        let w = img.naturalWidth;
+        let h = img.naturalHeight;
+        if (Math.max(w, h) > MAX_DIM) {
+          const scale = MAX_DIM / Math.max(w, h);
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+
+        // Grayscale + contrast boost + binary threshold
+        const imageData = ctx.getImageData(0, 0, w, h);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          let gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          // Boost contrast
+          gray = ((gray / 255 - 0.5) * 1.8 + 0.5) * 255;
+          gray = gray < 0 ? 0 : gray > 255 ? 255 : gray;
+          // Binary threshold
+          const val = gray > 128 ? 255 : 0;
+          data[i] = data[i + 1] = data[i + 2] = val;
+        }
+        ctx.putImageData(imageData, 0, 0);
+
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        const processedFile = new File([blob], 'processed.png', { type: 'image/png' });
+
+        return await scanWithHtml5Qrcode(processedFile);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    async function scanImageFile(file) {
+      // Tier 1: html5-qrcode scanFile
+      try {
+        const result = await scanWithHtml5Qrcode(file);
+        if (result && result.decodedText) return result.decodedText;
+      } catch { /* try next tier */ }
+
+      // Tier 2: Native BarcodeDetector API
+      try {
+        const barcode = await scanWithBarcodeDetector(file);
+        if (barcode) return barcode;
+      } catch { /* try next tier */ }
+
+      // Tier 3: Canvas preprocessing + rescan
+      try {
+        const result = await preprocessAndRescan(file);
+        if (result && result.decodedText) return result.decodedText;
+      } catch { /* all tiers failed */ }
+
+      return null;
+    }
+
+    async function handleImageUpload(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      // Reset file input so the same file can be re-selected
+      event.target.value = '';
+
+      await stopScanner();
+      uploadError.value = null;
+      uploadPreview.value = URL.createObjectURL(file);
+      uploadScanning.value = true;
+
+      try {
+        const barcode = await scanImageFile(file);
+        if (barcode) {
+          // Flash + vibrate feedback
+          showFlash.value = true;
+          setTimeout(() => showFlash.value = false, 500);
+          if (navigator.vibrate) navigator.vibrate(100);
+          clearUploadPreview();
+          await lookupProduct(barcode);
+        } else {
+          uploadError.value = 'Could not detect a barcode in this image. Try a clearer photo with the barcode fully visible.';
+        }
+      } catch (err) {
+        console.error('Image scan failed:', err);
+        uploadError.value = 'Failed to process image. Please try another photo.';
+      } finally {
+        uploadScanning.value = false;
+      }
+    }
+
+    function clearUploadPreview() {
+      if (uploadPreview.value) {
+        URL.revokeObjectURL(uploadPreview.value);
+        uploadPreview.value = null;
+      }
+      uploadError.value = null;
+      uploadScanning.value = false;
+    }
+
+    async function captureAndScan() {
+      const video = document.querySelector('#scanner-region video');
+      if (!video) return;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+
+      await stopScanner();
+      uploadError.value = null;
+      uploadPreview.value = canvas.toDataURL('image/png');
+      uploadScanning.value = true;
+
+      try {
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        const file = new File([blob], 'capture.png', { type: 'image/png' });
+        const barcode = await scanImageFile(file);
+        if (barcode) {
+          showFlash.value = true;
+          setTimeout(() => showFlash.value = false, 500);
+          if (navigator.vibrate) navigator.vibrate(100);
+          clearUploadPreview();
+          await lookupProduct(barcode);
+        } else {
+          uploadError.value = 'Could not detect a barcode in the captured frame. Try holding the camera steadier or use Upload.';
+        }
+      } catch (err) {
+        console.error('Capture scan failed:', err);
+        uploadError.value = 'Failed to process captured image.';
+      } finally {
+        uploadScanning.value = false;
+      }
+    }
+
     // ── Navigation ──
     function switchTab(tab) {
       currentTab.value = tab;
@@ -218,11 +402,17 @@ const app = createApp({
       manualBarcode,
       showFlash,
       toast,
+      uploadScanning,
+      uploadPreview,
+      uploadError,
       startScanner,
       stopScanner,
       switchTab,
       scanAgain,
       handleManualSubmit,
+      handleImageUpload,
+      clearUploadPreview,
+      captureAndScan,
       lookupProduct,
       viewHistoryProduct,
       removeFromHistory,
@@ -278,6 +468,12 @@ const app = createApp({
 
         <p v-if="scannerActive" class="scanner-hint">Point camera at a barcode</p>
 
+        <div v-if="scannerActive" class="capture-controls">
+          <button class="btn btn-capture" @click="captureAndScan()">
+            📷 Capture & Scan
+          </button>
+        </div>
+
         <!-- Camera error message -->
         <div v-if="error && currentTab === 'scanner'" class="error-card">
           <div class="error-icon">📷</div>
@@ -307,6 +503,39 @@ const app = createApp({
           <button class="btn btn-primary" @click="handleManualSubmit" :disabled="!manualBarcode.trim()">
             🔍
           </button>
+        </div>
+
+        <div class="divider">or upload an image</div>
+
+        <!-- Hidden element for html5-qrcode file scanning -->
+        <div id="upload-scan-region" style="display:none"></div>
+
+        <div class="upload-area">
+          <!-- Image Preview -->
+          <div v-if="uploadPreview" class="upload-preview">
+            <img :src="uploadPreview" alt="Uploaded barcode image">
+            <button v-if="!uploadScanning" class="upload-preview-clear" @click="clearUploadPreview()" title="Clear">✕</button>
+            <div v-if="uploadScanning" class="upload-scanning-overlay">
+              <div class="spinner"></div>
+              <span>Scanning barcode...</span>
+            </div>
+          </div>
+
+          <!-- Upload Error -->
+          <div v-if="uploadError" class="upload-error">
+            <span>⚠️</span> {{ uploadError }}
+          </div>
+
+          <!-- Upload Button -->
+          <label class="btn btn-secondary upload-btn">
+            📁 Upload Barcode Image
+            <input
+              type="file"
+              accept="image/*"
+              @change="handleImageUpload"
+              style="display:none"
+            >
+          </label>
         </div>
       </div>
 
