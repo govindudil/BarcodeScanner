@@ -86,7 +86,7 @@ const app = createApp({
           verbose: false
         });
         await html5Qrcode.start(
-          { facingMode: 'environment' },
+          { facingMode: { exact: 'environment' } },
           {
             fps: 15,
             qrbox: function(viewfinderWidth, viewfinderHeight) {
@@ -98,6 +98,7 @@ const app = createApp({
             aspectRatio: 4 / 3,
             disableFlip: true,
             videoConstraints: {
+              facingMode: { exact: 'environment' },
               width: { ideal: 1280 },
               height: { ideal: 720 },
             },
